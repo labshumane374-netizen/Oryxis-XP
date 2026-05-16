@@ -2272,9 +2272,9 @@ body {
       <div class="desktop-icon-img">📹</div>
       <div class="desktop-icon-label">Surveillance<br>CCTV</div>
     </div>
-    <div class="desktop-icon shortcut-icon" id="coffre-icon" style="opacity:0.85;">
-      <div class="desktop-icon-img">🔐</div>
-      <div class="desktop-icon-label">Coffre<br>Numérique</div>
+    <div class="desktop-icon shortcut-icon" id="cmd-icon">
+      <div class="desktop-icon-img">💻</div>
+      <div class="desktop-icon-label">Invite de<br>commandes</div>
     </div>
   </div>
 </div>
@@ -11391,7 +11391,7 @@ document.addEventListener('keydown', e => {
   </script>
 
 <!-- ╔══════════════════════════════════════════════════════════════╗ -->
-<!-- ║   COFFRE NUMÉRIQUE — App cachée (chasse au trésor RP)        ║ -->
+<!-- ║   INVITE DE COMMANDES + COFFRE BIOS — chasse au trésor RP    ║ -->
 <!-- ╚══════════════════════════════════════════════════════════════╝ -->
 <style>
   /* Resize sur toutes les fenêtres */
@@ -11410,220 +11410,482 @@ document.addEventListener('keydown', e => {
     pointer-events: none;
     opacity: 0.7;
   }
-  /* Coffre numérique */
-  .coffre-lock {
-    height: 100%; display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
-    color: #d4af37; padding: 30px; gap: 16px;
+
+  /* INVITE DE COMMANDES (cmd.exe style) */
+  .cmd-body {
+    background: #000;
+    color: #c0c0c0;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    padding: 8px;
+    height: 100%;
+    overflow-y: auto;
+    cursor: text;
+    line-height: 1.4;
   }
-  .coffre-icon-big { font-size: 64px; filter: drop-shadow(0 0 10px rgba(212,175,55,0.5)); }
-  .coffre-title { font-size: 18px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; }
-  .coffre-sub { font-size: 11px; color: #888; letter-spacing: 1px; margin-bottom: 10px; }
-  .coffre-form {
-    background: rgba(255,255,255,0.05); border: 1px solid #444;
-    padding: 20px; border-radius: 6px; width: 280px;
+  .cmd-line { white-space: pre-wrap; word-break: break-all; }
+  .cmd-prompt { color: #c0c0c0; }
+  .cmd-out { color: #c0c0c0; }
+  .cmd-err { color: #ff6b6b; }
+  .cmd-input-line { display: flex; }
+  .cmd-input {
+    background: transparent; border: none; outline: none;
+    color: #c0c0c0; font-family: inherit; font-size: 13px;
+    flex: 1; padding: 0; margin: 0;
+    caret-color: #c0c0c0;
   }
-  .coffre-form label {
-    display: block; font-size: 11px; color: #aaa;
-    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; margin-top: 10px;
+
+  /* COFFRE login overlay (sobre, dans le cmd) */
+  .cmd-lock-prompt { color: #ffd700; }
+
+  /* MODE BIOS — plein écran Matrix vert */
+  #bios-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: #000;
+    z-index: 999998;
+    overflow: hidden;
   }
-  .coffre-form label:first-child { margin-top: 0; }
-  .coffre-form input {
-    width: 100%; padding: 8px 10px; border: 1px solid #555;
-    background: #0a0a14; color: #d4af37; font-family: monospace; font-size: 13px;
-    box-sizing: border-box; border-radius: 3px;
+  #bios-overlay.show { display: block; }
+
+  /* Scanlines effet CRT */
+  #bios-overlay::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 255, 65, 0.02) 0px,
+      rgba(0, 255, 65, 0.02) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    pointer-events: none;
+    z-index: 3;
   }
-  .coffre-form input:focus { outline: none; border-color: #d4af37; box-shadow: 0 0 6px rgba(212,175,55,0.3); }
-  .coffre-form button {
-    width: 100%; padding: 10px; margin-top: 16px;
-    background: linear-gradient(180deg, #d4af37, #a8881e);
-    color: #1a1a2e; border: none; cursor: pointer;
-    font-family: 'Tahoma', sans-serif; font-weight: bold; font-size: 12px;
-    letter-spacing: 2px; text-transform: uppercase; border-radius: 3px;
+  /* Glow CRT */
+  #bios-overlay::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.6) 100%);
+    pointer-events: none;
+    z-index: 4;
   }
-  .coffre-form button:hover { background: linear-gradient(180deg, #f0c850, #d4af37); }
-  .coffre-error {
-    color: #cc4444; font-size: 11px; margin-top: 10px;
-    text-align: center; display: none; letter-spacing: 1px;
+
+  #bios-canvas {
+    position: absolute; inset: 0;
+    opacity: 0.15;
+    z-index: 1;
   }
-  .coffre-error.show { display: block; }
-  .coffre-attempts {
-    font-size: 10px; color: #555; margin-top: 8px;
+
+  #bios-content {
+    position: relative; z-index: 5;
+    color: #00ff41;
+    font-family: 'Consolas', 'Courier New', monospace;
+    padding: 30px 50px;
+    height: 100%;
+    overflow-y: auto;
+    text-shadow: 0 0 4px #00ff41;
+    animation: bios-flicker 8s infinite;
+  }
+  @keyframes bios-flicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.96; }
+    52% { opacity: 0.92; }
+    54% { opacity: 1; }
+  }
+
+  .bios-header {
+    border-bottom: 1px solid #00ff41;
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    letter-spacing: 2px;
+  }
+  .bios-title {
+    text-align: center;
+    font-size: 22px;
+    letter-spacing: 8px;
+    margin: 20px 0 24px;
+    color: #41ffff;
+    text-shadow: 0 0 8px #41ffff;
+    border-top: 2px solid #00ff41;
+    border-bottom: 2px solid #00ff41;
+    padding: 12px 0;
+  }
+  .bios-section {
+    margin-bottom: 24px;
+    border: 1px solid #00ff41;
+    padding: 14px 18px;
+    background: rgba(0, 255, 65, 0.03);
+  }
+  .bios-section-title {
+    color: #41ffff;
+    font-size: 14px;
+    letter-spacing: 3px;
+    margin-bottom: 10px;
+    border-bottom: 1px dashed #00aa30;
+    padding-bottom: 4px;
+  }
+  .bios-section-body {
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: #88ff88;
+  }
+  .bios-placeholder {
+    color: #557755;
+    font-style: italic;
+    padding: 8px 12px;
+    border-left: 2px solid #00aa30;
+    background: rgba(0, 255, 65, 0.04);
+  }
+  .bios-footer {
+    margin-top: 30px;
+    padding-top: 14px;
+    border-top: 1px solid #00ff41;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-align: center;
+    color: #00aa30;
+    animation: bios-blink 1.5s infinite;
+  }
+  @keyframes bios-blink {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 0.3; }
+  }
+  .bios-meta {
+    font-size: 10px;
+    color: #00aa30;
     letter-spacing: 1px;
   }
-  /* Vue déverrouillée */
-  .coffre-content {
-    height: 100%; display: none; flex-direction: column;
-    background: #f8f3e0; color: #2a1f0f;
-    padding: 24px; overflow: auto;
-  }
-  .coffre-content.show { display: flex; }
-  .coffre-header-unlocked {
-    display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 2px solid #d4af37; padding-bottom: 10px; margin-bottom: 16px;
-  }
-  .coffre-header-unlocked h2 {
-    font-family: Georgia, serif; font-size: 18px; color: #1a1a2e;
-  }
-  .coffre-user-badge {
-    background: #d4af37; color: #1a1a2e; padding: 3px 10px;
-    border-radius: 10px; font-size: 11px; font-weight: bold;
-  }
-  .coffre-section {
-    background: #fff; border: 1px solid #d4af37;
-    padding: 14px; margin-bottom: 12px; border-radius: 4px;
-  }
-  .coffre-section h3 {
-    font-family: Georgia, serif; font-size: 14px; color: #1a1a2e;
-    border-bottom: 1px dashed #ccc; padding-bottom: 4px; margin-bottom: 8px;
-  }
-  .coffre-section p {
-    font-family: 'Tahoma', sans-serif; font-size: 12px; line-height: 1.6; color: #333;
-  }
-  .coffre-placeholder {
-    background: #fff8e1; border: 1px dashed #d4af37;
-    padding: 14px; font-style: italic; color: #777; font-size: 12px;
-    text-align: center; line-height: 1.6;
-  }
-  .coffre-logout-btn {
-    background: #cc4444; color: #fff; border: none;
-    padding: 5px 12px; cursor: pointer; font-size: 11px;
-    border-radius: 3px;
-  }
-  .coffre-logout-btn:hover { background: #ee5555; }
 </style>
 
-<div class="window" id="coffre-window" style="display:none; width:480px; height:420px; z-index:1200;">
+<!-- Fenêtre cmd.exe -->
+<div class="window" id="cmd-window" style="display:none; width:580px; height:380px; z-index:1200;">
   <div class="title-bar">
-    <span class="title-bar-icon">🔐</span>
-    <span class="title-bar-text">Coffre Numérique</span>
+    <span class="title-bar-icon">💻</span>
+    <span class="title-bar-text">C:\WINDOWS\system32\cmd.exe</span>
     <div class="title-bar-buttons">
       <button class="title-bar-button btn-minimize">_</button>
       <button class="title-bar-button btn-maximize">□</button>
-      <button class="title-bar-button btn-close" id="coffre-close-btn">✕</button>
+      <button class="title-bar-button btn-close" id="cmd-close-btn">✕</button>
     </div>
   </div>
   <div class="window-content" style="height:100%;padding:0;">
-    <!-- Vue lock -->
-    <div id="coffre-lock-view" class="coffre-lock">
-      <div class="coffre-icon-big">🔐</div>
-      <div class="coffre-title">Coffre Numérique</div>
-      <div class="coffre-sub">▼ Accès restreint ▼</div>
-      <div class="coffre-form">
-        <label>Identifiant</label>
-        <input type="text" id="coffre-login" autocomplete="off" spellcheck="false">
-        <label>Mot de passe</label>
-        <input type="password" id="coffre-pwd" autocomplete="off">
-        <button id="coffre-unlock-btn">▶ DÉVERROUILLER</button>
-        <div class="coffre-error" id="coffre-error">⚠ Identifiants incorrects</div>
-        <div class="coffre-attempts" id="coffre-attempts">Tentatives : 0</div>
-      </div>
-    </div>
-    <!-- Vue déverrouillée -->
-    <div id="coffre-unlocked-view" class="coffre-content">
-      <div class="coffre-header-unlocked">
-        <h2>📂 Contenu du Coffre</h2>
-        <div style="display:flex; gap:10px; align-items:center;">
-          <span class="coffre-user-badge" id="coffre-user-badge">—</span>
-          <button class="coffre-logout-btn" id="coffre-logout-btn">↪ Verrouiller</button>
-        </div>
-      </div>
-
-      <div class="coffre-section">
-        <h3>📜 Document confidentiel #1</h3>
-        <div class="coffre-placeholder">
-          [ Emplacement réservé. Le contenu sera ajouté ultérieurement par l'administrateur. ]
-        </div>
-      </div>
-
-      <div class="coffre-section">
-        <h3>🗝 Document confidentiel #2</h3>
-        <div class="coffre-placeholder">
-          [ Emplacement réservé. Le contenu sera ajouté ultérieurement par l'administrateur. ]
-        </div>
-      </div>
-
-      <div class="coffre-section">
-        <h3>📨 Document confidentiel #3</h3>
-        <div class="coffre-placeholder">
-          [ Emplacement réservé. Le contenu sera ajouté ultérieurement par l'administrateur. ]
-        </div>
+    <div class="cmd-body" id="cmd-body" tabindex="0">
+      <div id="cmd-output"></div>
+      <div class="cmd-input-line">
+        <span class="cmd-prompt" id="cmd-prompt-label">C:\Users\Administrateur&gt;&nbsp;</span><input type="text" class="cmd-input" id="cmd-input" autocomplete="off" spellcheck="false">
       </div>
     </div>
   </div>
 </div>
 
+<!-- Overlay BIOS Matrix (plein écran) -->
+<div id="bios-overlay">
+  <canvas id="bios-canvas"></canvas>
+  <div id="bios-content"></div>
+</div>
+
 <script>
-/* ═══════════ COFFRE NUMÉRIQUE ═══════════ */
+/* ═══════════ INVITE DE COMMANDES ═══════════ */
 const COFFRE_ACCOUNTS = {
   'k.lavigne': { pwd: 'noctambule', label: 'K. Lavigne' }
 };
-let coffreAttempts = 0;
 
-function openCoffre() {
-  const win = document.getElementById('coffre-window');
+let cmdState = {
+  mode: 'normal',       // 'normal' | 'awaiting-login' | 'awaiting-pwd'
+  loginAttempt: '',
+};
+
+function openCmd() {
+  const win = document.getElementById('cmd-window');
   if (!win) return;
   win.style.display = 'block';
-  if (typeof addTaskbarItem === 'function') addTaskbarItem('coffre', '🔐', 'Coffre');
+  if (typeof addTaskbarItem === 'function') addTaskbarItem('cmd', '💻', 'Invite cmd');
   if (typeof bringToFront === 'function') bringToFront(win);
   if (typeof playSound === 'function') playSound('click');
-  // Reset à l'écran de lock
-  document.getElementById('coffre-lock-view').style.display = 'flex';
-  document.getElementById('coffre-unlocked-view').classList.remove('show');
-  document.getElementById('coffre-login').value = '';
-  document.getElementById('coffre-pwd').value = '';
-  document.getElementById('coffre-error').classList.remove('show');
-  setTimeout(() => document.getElementById('coffre-login').focus(), 100);
+  // Reset
+  const out = document.getElementById('cmd-output');
+  out.innerHTML = '';
+  cmdState = { mode: 'normal', loginAttempt: '' };
+  cmdPrint('Microsoft Windows XP [version 5.1.2600]', 'cmd-out');
+  cmdPrint('(C) Copyright 1985-2001 Microsoft Corp.', 'cmd-out');
+  cmdPrint('', 'cmd-out');
+  cmdPrint('Type "help" for available commands.', 'cmd-out');
+  cmdPrint('', 'cmd-out');
+  setTimeout(() => document.getElementById('cmd-input').focus(), 100);
 }
 
-function closeCoffre() {
-  document.getElementById('coffre-window').style.display = 'none';
-  if (typeof removeTaskbarItem === 'function') removeTaskbarItem('coffre');
+function closeCmd() {
+  document.getElementById('cmd-window').style.display = 'none';
+  if (typeof removeTaskbarItem === 'function') removeTaskbarItem('cmd');
 }
 
-function coffreTryUnlock() {
-  const u = document.getElementById('coffre-login').value.trim().toLowerCase();
-  const p = document.getElementById('coffre-pwd').value;
-  const err = document.getElementById('coffre-error');
-  const acc = COFFRE_ACCOUNTS[u];
-  if (acc && acc.pwd === p) {
-    document.getElementById('coffre-lock-view').style.display = 'none';
-    document.getElementById('coffre-unlocked-view').classList.add('show');
-    document.getElementById('coffre-user-badge').textContent = '👤 ' + acc.label;
-    coffreAttempts = 0;
-    if (typeof playSound === 'function') playSound('logon');
+function cmdPrint(text, cls) {
+  const out = document.getElementById('cmd-output');
+  const div = document.createElement('div');
+  div.className = 'cmd-line ' + (cls || 'cmd-out');
+  div.textContent = text;
+  out.appendChild(div);
+  document.getElementById('cmd-body').scrollTop = 999999;
+}
+
+function cmdSetPrompt(label, mask) {
+  const lbl = document.getElementById('cmd-prompt-label');
+  lbl.textContent = label;
+  const inp = document.getElementById('cmd-input');
+  inp.type = mask ? 'password' : 'text';
+}
+
+function cmdHandleInput(raw) {
+  // Echo de la ligne saisie
+  const promptLabel = document.getElementById('cmd-prompt-label').textContent;
+  if (cmdState.mode === 'awaiting-pwd') {
+    cmdPrint(promptLabel + '********', 'cmd-out');
   } else {
-    coffreAttempts++;
-    err.classList.add('show');
-    document.getElementById('coffre-attempts').textContent = 'Tentatives : ' + coffreAttempts;
-    if (typeof playSound === 'function') playSound('error');
-    document.getElementById('coffre-pwd').value = '';
-    document.getElementById('coffre-pwd').focus();
+    cmdPrint(promptLabel + raw, 'cmd-out');
+  }
+
+  // Modes spéciaux : login en cours
+  if (cmdState.mode === 'awaiting-login') {
+    cmdState.loginAttempt = raw.trim().toLowerCase();
+    cmdState.mode = 'awaiting-pwd';
+    cmdSetPrompt('Mot de passe : ', true);
+    return;
+  }
+  if (cmdState.mode === 'awaiting-pwd') {
+    const u = cmdState.loginAttempt;
+    const acc = COFFRE_ACCOUNTS[u];
+    cmdState.mode = 'normal';
+    cmdSetPrompt('C:\\Users\\Administrateur> ', false);
+    if (acc && acc.pwd === raw) {
+      cmdPrint('', 'cmd-out');
+      cmdPrint('[OK] Authentification reussie. Chargement du coffre...', 'cmd-out');
+      setTimeout(() => openBios(acc.label), 700);
+    } else {
+      cmdPrint('', 'cmd-out');
+      cmdPrint("[ERREUR] Identifiants incorrects.", 'cmd-err');
+      cmdPrint("Acces refuse. Tentative enregistree.", 'cmd-err');
+      cmdPrint('', 'cmd-out');
+    }
+    return;
+  }
+
+  // Commandes normales
+  const c = raw.trim().toLowerCase();
+  if (!c) return;
+  const parts = c.split(/\s+/);
+  const cmd = parts[0];
+
+  switch (cmd) {
+    case 'help':
+      cmdPrint('Commandes disponibles :', 'cmd-out');
+      cmdPrint('  HELP          - Affiche cette aide', 'cmd-out');
+      cmdPrint('  CLS           - Efface l\'ecran', 'cmd-out');
+      cmdPrint('  DIR           - Liste les fichiers du repertoire courant', 'cmd-out');
+      cmdPrint('  WHOAMI        - Affiche le nom d\'utilisateur', 'cmd-out');
+      cmdPrint('  DATE          - Affiche la date courante', 'cmd-out');
+      cmdPrint('  TIME          - Affiche l\'heure courante', 'cmd-out');
+      cmdPrint('  VER           - Affiche la version Windows', 'cmd-out');
+      cmdPrint('  IPCONFIG      - Affiche la configuration reseau', 'cmd-out');
+      cmdPrint('  ECHO <texte>  - Affiche un texte', 'cmd-out');
+      cmdPrint('  EXIT          - Ferme la console', 'cmd-out');
+      cmdPrint('', 'cmd-out');
+      break;
+    case 'cls':
+    case 'clear':
+      document.getElementById('cmd-output').innerHTML = '';
+      break;
+    case 'dir':
+      cmdPrint(' Volume dans le lecteur C: n\'a pas de nom.', 'cmd-out');
+      cmdPrint(' Numero de serie du volume : 4A2E-7F13', 'cmd-out');
+      cmdPrint('', 'cmd-out');
+      cmdPrint(' Repertoire de C:\\Users\\Administrateur', 'cmd-out');
+      cmdPrint('', 'cmd-out');
+      cmdPrint('16/05/2026  20:14    <DIR>          .', 'cmd-out');
+      cmdPrint('16/05/2026  20:14    <DIR>          ..', 'cmd-out');
+      cmdPrint('15/05/2026  19:42    <DIR>          Bureau', 'cmd-out');
+      cmdPrint('14/05/2026  09:11    <DIR>          Documents', 'cmd-out');
+      cmdPrint('12/05/2026  22:08         1 247 ko  config.sys', 'cmd-out');
+      cmdPrint('10/05/2026  03:47           384 o   ghost.dat', 'cmd-out');
+      cmdPrint('               2 fichier(s)        1 247 ko', 'cmd-out');
+      cmdPrint('               4 Rep(s)  47 853 248 octets libres', 'cmd-out');
+      cmdPrint('', 'cmd-out');
+      break;
+    case 'whoami':
+      cmdPrint('oryxis-pc-01\\administrateur', 'cmd-out');
+      cmdPrint('', 'cmd-out');
+      break;
+    case 'date':
+      cmdPrint('La date du jour est : ' + new Date().toLocaleDateString('fr-FR'), 'cmd-out');
+      cmdPrint('', 'cmd-out');
+      break;
+    case 'time':
+      cmdPrint('L\'heure courante est : ' + new Date().toLocaleTimeString('fr-FR'), 'cmd-out');
+      cmdPrint('', 'cmd-out');
+      break;
+    case 'ver':
+      cmdPrint('', 'cmd-out');
+      cmdPrint('Microsoft Windows XP [version 5.1.2600]', 'cmd-out');
+      cmdPrint('', 'cmd-out');
+      break;
+    case 'ipconfig':
+      cmdPrint('', 'cmd-out');
+      cmdPrint('Configuration IP de Windows', 'cmd-out');
+      cmdPrint('', 'cmd-out');
+      cmdPrint('Carte Ethernet Connexion au reseau local :', 'cmd-out');
+      cmdPrint('', 'cmd-out');
+      cmdPrint('   Suffixe DNS specifique a la connexion : oryxis.local', 'cmd-out');
+      cmdPrint('   Adresse IP. . . . . . . . . . . . . . : 192.168.1.4', 'cmd-out');
+      cmdPrint('   Masque de sous-reseau . . . . . . . . : 255.255.255.0', 'cmd-out');
+      cmdPrint('   Passerelle par defaut . . . . . . . . : 192.168.1.1', 'cmd-out');
+      cmdPrint('', 'cmd-out');
+      break;
+    case 'echo':
+      cmdPrint(raw.trim().substring(5) || 'ECHO is on.', 'cmd-out');
+      cmdPrint('', 'cmd-out');
+      break;
+    case 'exit':
+      closeCmd();
+      break;
+    case 'open':
+      if (parts[1] === 'coffre') {
+        cmdPrint('', 'cmd-out');
+        cmdPrint('[*] Initialisation du Coffre Numerique...', 'cmd-out');
+        cmdPrint('[*] Authentification requise.', 'cmd-out');
+        cmdPrint('', 'cmd-out');
+        cmdState.mode = 'awaiting-login';
+        cmdSetPrompt('Identifiant : ', false);
+      } else {
+        cmdPrint("Usage: open <module>", 'cmd-err');
+        cmdPrint("Modules disponibles : (acces restreint)", 'cmd-err');
+        cmdPrint('', 'cmd-out');
+      }
+      break;
+    case 'cat':
+    case 'type':
+      if (parts[1] === 'ghost.dat') {
+        cmdPrint('[BINAIRE] Fichier chiffre. Necessite un dechiffreur.', 'cmd-err');
+        cmdPrint('Indice : ce fichier est lie au Coffre Numerique.', 'cmd-out');
+        cmdPrint('', 'cmd-out');
+      } else if (parts[1] === 'config.sys') {
+        cmdPrint('# Configuration systeme', 'cmd-out');
+        cmdPrint('VERSION=5.1.2600', 'cmd-out');
+        cmdPrint('HOSTNAME=oryxis-pc-01', 'cmd-out');
+        cmdPrint('# (le reste est chiffre)', 'cmd-out');
+        cmdPrint('', 'cmd-out');
+      } else {
+        cmdPrint('Le systeme ne peut pas trouver le fichier specifie.', 'cmd-err');
+        cmdPrint('', 'cmd-out');
+      }
+      break;
+    default:
+      cmdPrint("'" + cmd + "' n'est pas reconnu en tant que commande interne", 'cmd-err');
+      cmdPrint("ou externe, un programme executable ou un fichier de commandes.", 'cmd-err');
+      cmdPrint('', 'cmd-out');
   }
 }
 
-const _coffreIcon = document.getElementById('coffre-icon');
-if (_coffreIcon) _coffreIcon.addEventListener('dblclick', openCoffre);
+const _cmdIcon = document.getElementById('cmd-icon');
+if (_cmdIcon) _cmdIcon.addEventListener('dblclick', openCmd);
 
-const _coffreClose = document.getElementById('coffre-close-btn');
-if (_coffreClose) _coffreClose.addEventListener('click', closeCoffre);
+const _cmdClose = document.getElementById('cmd-close-btn');
+if (_cmdClose) _cmdClose.addEventListener('click', closeCmd);
 
-const _coffreLogout = document.getElementById('coffre-logout-btn');
-if (_coffreLogout) _coffreLogout.addEventListener('click', () => {
-  document.getElementById('coffre-unlocked-view').classList.remove('show');
-  document.getElementById('coffre-lock-view').style.display = 'flex';
-  document.getElementById('coffre-login').value = '';
-  document.getElementById('coffre-pwd').value = '';
-});
+const _cmdInput = document.getElementById('cmd-input');
+if (_cmdInput) {
+  _cmdInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const v = e.target.value;
+      e.target.value = '';
+      cmdHandleInput(v);
+    }
+  });
+}
 
-const _coffreBtn = document.getElementById('coffre-unlock-btn');
-if (_coffreBtn) _coffreBtn.addEventListener('click', coffreTryUnlock);
+const _cmdBody = document.getElementById('cmd-body');
+if (_cmdBody) {
+  _cmdBody.addEventListener('click', () => document.getElementById('cmd-input').focus());
+}
 
-['coffre-login', 'coffre-pwd'].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') coffreTryUnlock(); });
-});
+/* ═══════════ BIOS COFFRE (plein écran Matrix) ═══════════ */
+let biosCanvasAnim = null;
+
+function openBios(userLabel) {
+  const overlay = document.getElementById('bios-overlay');
+  overlay.classList.add('show');
+
+  // Canvas matrix en arrière-plan
+  const canvas = document.getElementById('bios-canvas');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+  const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01ORYXISVAULT';
+  const fontSize = 14;
+  const cols = Math.floor(canvas.width / fontSize);
+  const drops = new Array(cols).fill(1);
+  function drawBios() {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#00ff41';
+    ctx.font = fontSize + 'px monospace';
+    for (let i = 0; i < drops.length; i++) {
+      const text = chars[Math.floor(Math.random() * chars.length)];
+      ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+      if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+      drops[i]++;
+    }
+    biosCanvasAnim = requestAnimationFrame(drawBios);
+  }
+  drawBios();
+
+  // Contenu du coffre
+  const content = document.getElementById('bios-content');
+  const now = new Date();
+  content.innerHTML = `
+    <div class="bios-header">
+      <span>ORYXIS BIOS v3.2 — VAULT MODULE</span>
+      <span class="bios-meta">SESSION: ${userLabel.toUpperCase()} | ${now.toLocaleString('fr-FR')}</span>
+    </div>
+
+    <div class="bios-title">▼ COFFRE NUMERIQUE — ACCES ROOT ▼</div>
+
+    <div class="bios-section">
+      <div class="bios-section-title">[ 01 ] DOCUMENT CONFIDENTIEL</div>
+      <div class="bios-section-body">
+        <div class="bios-placeholder">[ Emplacement reserve. Le contenu sera ajoute ulterieurement par l'administrateur. ]</div>
+      </div>
+    </div>
+
+    <div class="bios-section">
+      <div class="bios-section-title">[ 02 ] DOCUMENT CONFIDENTIEL</div>
+      <div class="bios-section-body">
+        <div class="bios-placeholder">[ Emplacement reserve. Le contenu sera ajoute ulterieurement par l'administrateur. ]</div>
+      </div>
+    </div>
+
+    <div class="bios-section">
+      <div class="bios-section-title">[ 03 ] DOCUMENT CONFIDENTIEL</div>
+      <div class="bios-section-body">
+        <div class="bios-placeholder">[ Emplacement reserve. Le contenu sera ajoute ulterieurement par l'administrateur. ]</div>
+      </div>
+    </div>
+
+    <div class="bios-footer">▼ APPUYE SUR [ ESC ] OU CLIQUE POUR FERMER ▼</div>
+  `;
+
+  // Sortie Echap / clic
+  const closeBios = () => {
+    overlay.classList.remove('show');
+    if (biosCanvasAnim) cancelAnimationFrame(biosCanvasAnim);
+    document.removeEventListener('keydown', escBios);
+  };
+  const escBios = e => { if (e.key === 'Escape') closeBios(); };
+  overlay.onclick = closeBios;
+  document.addEventListener('keydown', escBios);
+}
 </script>
 
 </body>
