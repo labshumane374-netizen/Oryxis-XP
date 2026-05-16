@@ -2272,6 +2272,10 @@ body {
       <div class="desktop-icon-img">📹</div>
       <div class="desktop-icon-label">Surveillance<br>CCTV</div>
     </div>
+    <div class="desktop-icon shortcut-icon" id="coffre-icon" style="opacity:0.85;">
+      <div class="desktop-icon-img">🔐</div>
+      <div class="desktop-icon-label">Coffre<br>Numérique</div>
+    </div>
   </div>
 </div>
 
@@ -11385,6 +11389,243 @@ document.addEventListener('keydown', e => {
 });
 
   </script>
+
+<!-- ╔══════════════════════════════════════════════════════════════╗ -->
+<!-- ║   COFFRE NUMÉRIQUE — App cachée (chasse au trésor RP)        ║ -->
+<!-- ╚══════════════════════════════════════════════════════════════╝ -->
+<style>
+  /* Resize sur toutes les fenêtres */
+  .window {
+    resize: both;
+    overflow: hidden;
+    min-width: 320px;
+    min-height: 200px;
+  }
+  .window::after {
+    content: '';
+    position: absolute;
+    right: 2px; bottom: 2px;
+    width: 14px; height: 14px;
+    background: linear-gradient(135deg, transparent 0%, transparent 50%, #888 50%, #888 60%, transparent 60%, transparent 70%, #888 70%, #888 80%, transparent 80%);
+    pointer-events: none;
+    opacity: 0.7;
+  }
+  /* Coffre numérique */
+  .coffre-lock {
+    height: 100%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
+    color: #d4af37; padding: 30px; gap: 16px;
+  }
+  .coffre-icon-big { font-size: 64px; filter: drop-shadow(0 0 10px rgba(212,175,55,0.5)); }
+  .coffre-title { font-size: 18px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; }
+  .coffre-sub { font-size: 11px; color: #888; letter-spacing: 1px; margin-bottom: 10px; }
+  .coffre-form {
+    background: rgba(255,255,255,0.05); border: 1px solid #444;
+    padding: 20px; border-radius: 6px; width: 280px;
+  }
+  .coffre-form label {
+    display: block; font-size: 11px; color: #aaa;
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; margin-top: 10px;
+  }
+  .coffre-form label:first-child { margin-top: 0; }
+  .coffre-form input {
+    width: 100%; padding: 8px 10px; border: 1px solid #555;
+    background: #0a0a14; color: #d4af37; font-family: monospace; font-size: 13px;
+    box-sizing: border-box; border-radius: 3px;
+  }
+  .coffre-form input:focus { outline: none; border-color: #d4af37; box-shadow: 0 0 6px rgba(212,175,55,0.3); }
+  .coffre-form button {
+    width: 100%; padding: 10px; margin-top: 16px;
+    background: linear-gradient(180deg, #d4af37, #a8881e);
+    color: #1a1a2e; border: none; cursor: pointer;
+    font-family: 'Tahoma', sans-serif; font-weight: bold; font-size: 12px;
+    letter-spacing: 2px; text-transform: uppercase; border-radius: 3px;
+  }
+  .coffre-form button:hover { background: linear-gradient(180deg, #f0c850, #d4af37); }
+  .coffre-error {
+    color: #cc4444; font-size: 11px; margin-top: 10px;
+    text-align: center; display: none; letter-spacing: 1px;
+  }
+  .coffre-error.show { display: block; }
+  .coffre-attempts {
+    font-size: 10px; color: #555; margin-top: 8px;
+    letter-spacing: 1px;
+  }
+  /* Vue déverrouillée */
+  .coffre-content {
+    height: 100%; display: none; flex-direction: column;
+    background: #f8f3e0; color: #2a1f0f;
+    padding: 24px; overflow: auto;
+  }
+  .coffre-content.show { display: flex; }
+  .coffre-header-unlocked {
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 2px solid #d4af37; padding-bottom: 10px; margin-bottom: 16px;
+  }
+  .coffre-header-unlocked h2 {
+    font-family: Georgia, serif; font-size: 18px; color: #1a1a2e;
+  }
+  .coffre-user-badge {
+    background: #d4af37; color: #1a1a2e; padding: 3px 10px;
+    border-radius: 10px; font-size: 11px; font-weight: bold;
+  }
+  .coffre-section {
+    background: #fff; border: 1px solid #d4af37;
+    padding: 14px; margin-bottom: 12px; border-radius: 4px;
+  }
+  .coffre-section h3 {
+    font-family: Georgia, serif; font-size: 14px; color: #1a1a2e;
+    border-bottom: 1px dashed #ccc; padding-bottom: 4px; margin-bottom: 8px;
+  }
+  .coffre-section p {
+    font-family: 'Tahoma', sans-serif; font-size: 12px; line-height: 1.6; color: #333;
+  }
+  .coffre-placeholder {
+    background: #fff8e1; border: 1px dashed #d4af37;
+    padding: 14px; font-style: italic; color: #777; font-size: 12px;
+    text-align: center; line-height: 1.6;
+  }
+  .coffre-logout-btn {
+    background: #cc4444; color: #fff; border: none;
+    padding: 5px 12px; cursor: pointer; font-size: 11px;
+    border-radius: 3px;
+  }
+  .coffre-logout-btn:hover { background: #ee5555; }
+</style>
+
+<div class="window" id="coffre-window" style="display:none; width:480px; height:420px; z-index:1200;">
+  <div class="title-bar">
+    <span class="title-bar-icon">🔐</span>
+    <span class="title-bar-text">Coffre Numérique</span>
+    <div class="title-bar-buttons">
+      <button class="title-bar-button btn-minimize">_</button>
+      <button class="title-bar-button btn-maximize">□</button>
+      <button class="title-bar-button btn-close" id="coffre-close-btn">✕</button>
+    </div>
+  </div>
+  <div class="window-content" style="height:100%;padding:0;">
+    <!-- Vue lock -->
+    <div id="coffre-lock-view" class="coffre-lock">
+      <div class="coffre-icon-big">🔐</div>
+      <div class="coffre-title">Coffre Numérique</div>
+      <div class="coffre-sub">▼ Accès restreint ▼</div>
+      <div class="coffre-form">
+        <label>Identifiant</label>
+        <input type="text" id="coffre-login" autocomplete="off" spellcheck="false">
+        <label>Mot de passe</label>
+        <input type="password" id="coffre-pwd" autocomplete="off">
+        <button id="coffre-unlock-btn">▶ DÉVERROUILLER</button>
+        <div class="coffre-error" id="coffre-error">⚠ Identifiants incorrects</div>
+        <div class="coffre-attempts" id="coffre-attempts">Tentatives : 0</div>
+      </div>
+    </div>
+    <!-- Vue déverrouillée -->
+    <div id="coffre-unlocked-view" class="coffre-content">
+      <div class="coffre-header-unlocked">
+        <h2>📂 Contenu du Coffre</h2>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <span class="coffre-user-badge" id="coffre-user-badge">—</span>
+          <button class="coffre-logout-btn" id="coffre-logout-btn">↪ Verrouiller</button>
+        </div>
+      </div>
+
+      <div class="coffre-section">
+        <h3>📜 Document confidentiel #1</h3>
+        <div class="coffre-placeholder">
+          [ Emplacement réservé. Le contenu sera ajouté ultérieurement par l'administrateur. ]
+        </div>
+      </div>
+
+      <div class="coffre-section">
+        <h3>🗝 Document confidentiel #2</h3>
+        <div class="coffre-placeholder">
+          [ Emplacement réservé. Le contenu sera ajouté ultérieurement par l'administrateur. ]
+        </div>
+      </div>
+
+      <div class="coffre-section">
+        <h3>📨 Document confidentiel #3</h3>
+        <div class="coffre-placeholder">
+          [ Emplacement réservé. Le contenu sera ajouté ultérieurement par l'administrateur. ]
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════ COFFRE NUMÉRIQUE ═══════════ */
+const COFFRE_ACCOUNTS = {
+  'k.lavigne': { pwd: 'noctambule', label: 'K. Lavigne' }
+};
+let coffreAttempts = 0;
+
+function openCoffre() {
+  const win = document.getElementById('coffre-window');
+  if (!win) return;
+  win.style.display = 'block';
+  if (typeof addTaskbarItem === 'function') addTaskbarItem('coffre', '🔐', 'Coffre');
+  if (typeof bringToFront === 'function') bringToFront(win);
+  if (typeof playSound === 'function') playSound('click');
+  // Reset à l'écran de lock
+  document.getElementById('coffre-lock-view').style.display = 'flex';
+  document.getElementById('coffre-unlocked-view').classList.remove('show');
+  document.getElementById('coffre-login').value = '';
+  document.getElementById('coffre-pwd').value = '';
+  document.getElementById('coffre-error').classList.remove('show');
+  setTimeout(() => document.getElementById('coffre-login').focus(), 100);
+}
+
+function closeCoffre() {
+  document.getElementById('coffre-window').style.display = 'none';
+  if (typeof removeTaskbarItem === 'function') removeTaskbarItem('coffre');
+}
+
+function coffreTryUnlock() {
+  const u = document.getElementById('coffre-login').value.trim().toLowerCase();
+  const p = document.getElementById('coffre-pwd').value;
+  const err = document.getElementById('coffre-error');
+  const acc = COFFRE_ACCOUNTS[u];
+  if (acc && acc.pwd === p) {
+    document.getElementById('coffre-lock-view').style.display = 'none';
+    document.getElementById('coffre-unlocked-view').classList.add('show');
+    document.getElementById('coffre-user-badge').textContent = '👤 ' + acc.label;
+    coffreAttempts = 0;
+    if (typeof playSound === 'function') playSound('logon');
+  } else {
+    coffreAttempts++;
+    err.classList.add('show');
+    document.getElementById('coffre-attempts').textContent = 'Tentatives : ' + coffreAttempts;
+    if (typeof playSound === 'function') playSound('error');
+    document.getElementById('coffre-pwd').value = '';
+    document.getElementById('coffre-pwd').focus();
+  }
+}
+
+const _coffreIcon = document.getElementById('coffre-icon');
+if (_coffreIcon) _coffreIcon.addEventListener('dblclick', openCoffre);
+
+const _coffreClose = document.getElementById('coffre-close-btn');
+if (_coffreClose) _coffreClose.addEventListener('click', closeCoffre);
+
+const _coffreLogout = document.getElementById('coffre-logout-btn');
+if (_coffreLogout) _coffreLogout.addEventListener('click', () => {
+  document.getElementById('coffre-unlocked-view').classList.remove('show');
+  document.getElementById('coffre-lock-view').style.display = 'flex';
+  document.getElementById('coffre-login').value = '';
+  document.getElementById('coffre-pwd').value = '';
+});
+
+const _coffreBtn = document.getElementById('coffre-unlock-btn');
+if (_coffreBtn) _coffreBtn.addEventListener('click', coffreTryUnlock);
+
+['coffre-login', 'coffre-pwd'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') coffreTryUnlock(); });
+});
+</script>
+
 </body>
 </html>
 
