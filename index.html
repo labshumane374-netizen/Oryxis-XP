@@ -11797,12 +11797,18 @@ const _cmdClose = document.getElementById('cmd-close-btn');
 if (_cmdClose) _cmdClose.addEventListener('click', closeCmd);
 
 const _cmdInput = document.getElementById('cmd-input');
+let _cmdEnterLock = false;
 if (_cmdInput) {
   _cmdInput.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (_cmdEnterLock) return;
+      _cmdEnterLock = true;
       const v = e.target.value;
       e.target.value = '';
-      cmdHandleInput(v);
+      try { cmdHandleInput(v); } catch (err) { console.error('cmd error:', err); }
+      setTimeout(() => { _cmdEnterLock = false; }, 50);
     }
   });
 }
