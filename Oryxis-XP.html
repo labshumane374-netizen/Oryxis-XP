@@ -11660,7 +11660,9 @@ function cmdHandleInput(raw) {
     const acc = COFFRE_ACCOUNTS[u];
     cmdState.mode = 'normal';
     cmdSetPrompt('C:\\Users\\Administrateur> ', false);
-    if (acc && acc.pwd === raw) {
+    // Comparaison tolérante : trim + insensible à la casse sur le mdp
+    const pwdTry = raw.trim().toLowerCase();
+    if (acc && acc.pwd.toLowerCase() === pwdTry) {
       cmdPrint('', 'cmd-out');
       cmdPrint('[OK] Authentification reussie. Chargement du coffre...', 'cmd-out');
       setTimeout(() => openBios(acc.label), 700);
