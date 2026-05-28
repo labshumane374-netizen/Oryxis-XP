@@ -913,11 +913,13 @@ body {
 .btn-close { background: linear-gradient(180deg, #f8a882 0%, #e87751 50%, #d85538 100%); color: #fff; text-shadow: 1px 1px 0 rgba(0,0,0,0.3); }
 .window.minimized { display: none !important; }
 .window.maximized {
-  width: calc(100vw - 40px) !important;
-  height: calc(100vh - 80px) !important;
-  top: 30px !important;
-  left: 20px !important;
-  border-radius: 4px !important;
+  width: 100vw !important;
+  height: calc(100vh - 30px) !important;
+  max-width: none !important;
+  max-height: none !important;
+  top: 0 !important;
+  left: 0 !important;
+  border-radius: 0 !important;
   transform: none !important;
 }
 .window.maximized .title-bar { border-radius: 0; }
@@ -10535,10 +10537,15 @@ function bringToFront(win){
   focusedWindowId = win.id;
 }
 
-// Clic sur une fenêtre pour la mettre au premier plan
-document.querySelectorAll('.window').forEach(win => {
-  win.addEventListener('mousedown', () => bringToFront(win));
-});
+// Clic sur une fenêtre pour la mettre au premier plan (idempotent, ré-appelable)
+function initWindowFocus(){
+  document.querySelectorAll('.window').forEach(win => {
+    if(win.dataset.focusBound) return;
+    win.dataset.focusBound='1';
+    win.addEventListener('mousedown', () => bringToFront(win));
+  });
+}
+initWindowFocus();
 
 function startWindowDrag(e){
   const bar=e.currentTarget;
@@ -10558,12 +10565,70 @@ function startWindowDrag(e){
 function initWindowDragging(){
   document.querySelectorAll('.window').forEach(win=>{
     const bar=win.querySelector('.title-bar');
-    if(!bar) return;
+    if(!bar || bar.dataset.dragBound) return;
+    bar.dataset.dragBound='1';
     bar.addEventListener('mousedown', startWindowDrag);
   });
 }
 
+// ===== Redimensionnement custom de toutes les fenêtres =====
+let resizingWindow=null, resizeStartX=0, resizeStartY=0, resizeStartW=0, resizeStartH=0;
+const IE_NO_RESIZE=new Set(['fileprops-window','display-window','sysprops-window','newitem-window','calculator-window']);
+function initWindowResizing(){
+  document.querySelectorAll('.window').forEach(win=>{
+    if(IE_NO_RESIZE.has(win.id)) return;
+    if(win.querySelector(':scope > .resize-handle')) return;
+    const h=document.createElement('div');
+    h.className='resize-handle';
+    h.addEventListener('mousedown', startWindowResize);
+    win.appendChild(h);
+  });
+}
+function startWindowResize(e){
+  const win=e.currentTarget.closest('.window');
+  if(!win || win.classList.contains('maximized')) return;
+  resizingWindow=win;
+  const rect=win.getBoundingClientRect();
+  win.style.left=rect.left+'px';
+  win.style.top=rect.top+'px';
+  win.style.transform='none';
+  resizeStartX=e.clientX; resizeStartY=e.clientY;
+  resizeStartW=rect.width; resizeStartH=rect.height;
+  win.classList.add('resizing');
+  document.body.classList.add('dragging-window-active');
+  bringToFront(win);
+  e.preventDefault(); e.stopPropagation();
+}
+function handleWindowResize(e){
+  if(!resizingWindow) return;
+  e.preventDefault();
+  const cs=getComputedStyle(resizingWindow);
+  const minW=parseInt(cs.minWidth)||320;
+  const minH=parseInt(cs.minHeight)||200;
+  const rect=resizingWindow.getBoundingClientRect();
+  const maxW=window.innerWidth - rect.left - 6;
+  const maxH=window.innerHeight - rect.top - 36;
+  let newW=resizeStartW+(e.clientX-resizeStartX);
+  let newH=resizeStartH+(e.clientY-resizeStartY);
+  newW=Math.min(Math.max(minW,newW),maxW);
+  newH=Math.min(Math.max(minH,newH),maxH);
+  resizingWindow.style.width=newW+'px';
+  resizingWindow.style.height=newH+'px';
+  resizingWindow.style.maxWidth='none';
+  resizingWindow.style.maxHeight='none';
+}
+function stopWindowResize(){
+  if(!resizingWindow) return;
+  resizingWindow.classList.remove('resizing');
+  resizingWindow=null;
+  document.body.classList.remove('dragging-window-active');
+}
+document.addEventListener('mousemove', handleWindowResize);
+document.addEventListener('mouseup', stopWindowResize);
+window.addEventListener('blur', stopWindowResize);
+
 initWindowDragging();
+initWindowResizing();
 clampAllWindows();
 
 function handleWindowDrag(e){
@@ -10686,10 +10751,10 @@ function maximizeWindow(windowId){
       transform: win.style.transform || ''
     };
     win.classList.add('maximized');
-    win.style.width='calc(100vw - 40px)';
-    win.style.height='calc(100vh - 80px)';
-    win.style.top='30px';
-    win.style.left='20px';
+    win.style.width='100vw';
+    win.style.height='calc(100vh - 30px)';
+    win.style.top='0';
+    win.style.left='0';
     win.style.transform='none';
   }
   bringToFront(win);
@@ -10705,36 +10770,40 @@ function restoreWindow(windowId){
   }
 }
 
-// Appliquer minimize/maximize à toutes les fenêtres
-document.querySelectorAll('.window').forEach(win => {
-  const minBtn = win.querySelector('.btn-minimize');
-  const maxBtn = win.querySelector('.btn-maximize');
-  const windowId = win.id;
-  
-  if(minBtn){
-    minBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      minimizeWindow(windowId);
-    });
-  }
-  
-  if(maxBtn){
-    maxBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      maximizeWindow(windowId);
-    });
-  }
-  
-  // Double-clic sur la barre de titre pour maximiser
-  const titleBar = win.querySelector('.title-bar');
-  if(titleBar){
-    titleBar.addEventListener('dblclick', (e) => {
-      if(!e.target.closest('.title-bar-button')){
+// Appliquer minimize/maximize à toutes les fenêtres (idempotent, ré-appelable)
+function initWindowControls(){
+  document.querySelectorAll('.window').forEach(win => {
+    if(win.dataset.ctrlBound) return;
+    win.dataset.ctrlBound='1';
+    const minBtn = win.querySelector('.btn-minimize');
+    const maxBtn = win.querySelector('.btn-maximize');
+    const windowId = win.id;
+
+    if(minBtn){
+      minBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        minimizeWindow(windowId);
+      });
+    }
+
+    if(maxBtn){
+      maxBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         maximizeWindow(windowId);
-      }
-    });
-  }
-});
+      });
+    }
+
+    const titleBar = win.querySelector('.title-bar');
+    if(titleBar){
+      titleBar.addEventListener('dblclick', (e) => {
+        if(!e.target.closest('.title-bar-button')){
+          maximizeWindow(windowId);
+        }
+      });
+    }
+  });
+}
+initWindowControls();
 
 // Modifier les clics sur la barre des tâches pour restaurer/minimiser les fenêtres
 const taskbarPrograms=document.getElementById('taskbar-programs');
@@ -11413,22 +11482,22 @@ document.addEventListener('keydown', e => {
 <!-- ║   INVITE DE COMMANDES + COFFRE BIOS — chasse au trésor RP    ║ -->
 <!-- ╚══════════════════════════════════════════════════════════════╝ -->
 <style>
-  /* Resize sur toutes les fenêtres */
+  /* Redimensionnement custom pour toutes les fenêtres */
   .window {
-    resize: both;
     overflow: hidden;
     min-width: 320px;
     min-height: 200px;
   }
-  .window::after {
-    content: '';
+  .window > .resize-handle {
     position: absolute;
-    right: 2px; bottom: 2px;
-    width: 14px; height: 14px;
-    background: linear-gradient(135deg, transparent 0%, transparent 50%, #888 50%, #888 60%, transparent 60%, transparent 70%, #888 70%, #888 80%, transparent 80%);
-    pointer-events: none;
-    opacity: 0.7;
+    right: 0; bottom: 0;
+    width: 18px; height: 18px;
+    cursor: nwse-resize;
+    z-index: 30;
+    background: linear-gradient(135deg, transparent 0%, transparent 45%, #999 45%, #999 55%, transparent 55%, transparent 65%, #999 65%, #999 75%, transparent 75%, transparent 85%, #999 85%, #999 95%, transparent 95%);
   }
+  .window.maximized > .resize-handle { display: none; }
+  .window.resizing { user-select: none; }
 
   /* INVITE DE COMMANDES (cmd.exe style) */
   .cmd-body {
@@ -11913,6 +11982,13 @@ function openBios(userLabel) {
   overlay.onclick = closeBios;
   document.addEventListener('keydown', escBios);
 }
+
+// Ré-initialise drag + resize + contrôles pour TOUTES les fenêtres, y compris
+// celles déclarées dans le HTML après les premiers appels. Appels idempotents.
+if (typeof initWindowResizing === 'function') initWindowResizing();
+if (typeof initWindowDragging === 'function') initWindowDragging();
+if (typeof initWindowControls === 'function') initWindowControls();
+if (typeof initWindowFocus === 'function') initWindowFocus();
 </script>
 
 </body>
