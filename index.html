@@ -3176,36 +3176,7 @@ body {
         </div>
       </div>
       <div class="cctv-grid" id="cctv-grid">
-        <div class="cctv-card">
-          <div class="cctv-title">classe A <span class="cctv-status">En ligne</span></div>
-          <img class="cctv-thumb" src="https://images.unsplash.com/photo-1528458965990-428de4b1cbf4?auto=format&fit=crop&w=800&q=50" alt="Cam A" loading="lazy">
-          <video class="cctv-video" poster="https://images.unsplash.com/photo-1528458965990-428de4b1cbf4?auto=format&fit=crop&w=800&q=50" data-src="https://samplelib.com/lib/preview/mp4/sample-5s.mp4" autoplay loop muted playsinline></video>
-        </div>
-        <div class="cctv-card">
-          <div class="cctv-title">classe B <span class="cctv-status cctv-alert">Détection mouvement</span></div>
-          <img class="cctv-thumb" src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=50" alt="Cam B" loading="lazy">
-          <video class="cctv-video" poster="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=50" data-src="https://samplelib.com/lib/preview/mp4/sample-10s.mp4" autoplay loop muted playsinline></video>
-        </div>
-        <div class="cctv-card">
-          <div class="cctv-title">classe C <span class="cctv-status">En ligne</span></div>
-          <img class="cctv-thumb" src="https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=800&q=50" alt="Cam C" loading="lazy">
-          <video class="cctv-video" poster="https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=800&q=50" data-src="https://samplelib.com/lib/preview/mp4/sample-7s.mp4" autoplay loop muted playsinline></video>
-        </div>
-        <div class="cctv-card">
-          <div class="cctv-title">classe D <span class="cctv-status">En ligne</span></div>
-          <img class="cctv-thumb" src="https://images.unsplash.com/photo-1526413232644-8a5e2c04b7f5?auto=format&fit=crop&w=800&q=50" alt="Cam D" loading="lazy">
-          <video class="cctv-video" poster="https://images.unsplash.com/photo-1526413232644-8a5e2c04b7f5?auto=format&fit=crop&w=800&q=50" data-src="https://samplelib.com/lib/preview/mp4/sample-12s.mp4" autoplay loop muted playsinline></video>
-        </div>
-        <div class="cctv-card">
-          <div class="cctv-title">Entrée principale <span class="cctv-status">En ligne</span></div>
-          <img class="cctv-thumb" src="https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=800&q=50" alt="Cam Entrée" loading="lazy">
-          <video class="cctv-video" poster="https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=800&q=50" data-src="https://samplelib.com/lib/preview/mp4/sample-15s.mp4" autoplay loop muted playsinline></video>
-        </div>
-        <div class="cctv-card">
-          <div class="cctv-title">Cour de promenade <span class="cctv-status">En ligne</span></div>
-          <img class="cctv-thumb" src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=50" alt="Cam Cour" loading="lazy">
-          <video class="cctv-video" poster="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=50" data-src="https://samplelib.com/lib/preview/mp4/sample-20s.mp4" autoplay loop muted playsinline></video>
-        </div>
+        <div style="color:#888;padding:20px;grid-column:1/-1;text-align:center;">Chargement des caméras...</div>
       </div>
     </div>
   </div>
@@ -7804,24 +7775,51 @@ function refreshCCTV(){
   });
 }
 
+var _cctvCameras = [];
+
+function buildCCTVGrid(cameras) {
+  var grid = document.getElementById('cctv-grid');
+  if (!grid) return;
+  if (!cameras || cameras.length === 0) {
+    grid.innerHTML = '<div style="color:#888;padding:20px;grid-column:1/-1;text-align:center;">Aucune caméra école trouvée.</div>';
+    return;
+  }
+  grid.innerHTML = '';
+  cameras.forEach(function(cam, i) {
+    var card = document.createElement('div');
+    card.className = 'cctv-card';
+    card.style.cursor = 'pointer';
+    card.innerHTML =
+      '<div class="cctv-title">' + (cam.name || 'CAM #'+(i+1)) + ' <span class="cctv-status">En ligne</span></div>' +
+      '<div class="cctv-feed" style="height:110px;display:flex;align-items:center;justify-content:center;font-size:28px;opacity:0.4;">📷</div>';
+    card.addEventListener('click', function() {
+      // Envoie au parent (NUI FiveM) via postMessage
+      window.parent.postMessage({ type: 'fivem:viewCamera', index: i + 1 }, '*');
+    });
+    grid.appendChild(card);
+  });
+}
+
 function openCCTV(){
   const win=document.getElementById('cctv-window');
   if(!win)return;
   win.style.display='block';
   addTaskbarItem('cctv','📹','CCTV Surveillance');
-  // Charge les flux vidéo au moment de l'ouverture pour permettre de remplacer par vos flux GTA RP
-  document.querySelectorAll('#cctv-grid .cctv-video').forEach(v=>{
-    const src=v.getAttribute('data-src');
-    if(src) v.src=src;
-    const thumb=v.previousElementSibling && v.previousElementSibling.classList.contains('cctv-thumb') ? v.previousElementSibling : null;
-    if(thumb){
-      v.addEventListener('error',()=>{v.style.display='none'; thumb.style.opacity=1;});
-      v.addEventListener('playing',()=>{v.style.display='block'; thumb.style.opacity=0.15;});
-      v.addEventListener('loadeddata',()=>{thumb.style.opacity=0.15;});
-    }
-  });
+  buildCCTVGrid(_cctvCameras);
   refreshCCTV();
 }
+
+// Écoute les messages du NUI FiveM parent
+window.addEventListener('message', function(e) {
+  if (!e.data || !e.data.type) return;
+  if (e.data.type === 'oryxis:cameras') {
+    _cctvCameras = e.data.cameras || [];
+    buildCCTVGrid(_cctvCameras);
+  }
+  if (e.data.type === 'oryxis:close') {
+    window.parent.postMessage({ type: 'fivem:close' }, '*');
+  }
+});
 
 // Calculatrice
 let calcValue = '0';
@@ -11473,6 +11471,8 @@ document.addEventListener('keydown', e => {
     document.getElementById('icon-context-menu').style.display = 'none';
     document.querySelectorAll('.desktop-icon').forEach(i => i.classList.remove('selected'));
     selectedIcon = null;
+    // Ferme le NUI FiveM via postMessage
+    window.parent.postMessage({ type: 'fivem:close' }, '*');
   }
 });
 
